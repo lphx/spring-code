@@ -1,0 +1,15 @@
+description = "Spring LphIoc "
+
+
+dependencies {
+    optional(project(":spring-context"))
+}
+// 创建缺失的src目录
+//task "create-dirs" {
+//    sourceSets*.java.srcDirs*.each {
+//        it.mkdirs()
+//    }
+//    sourceSets*.resources.srcDirs*.each {
+//        it.mkdirs()
+//    }
+//}
