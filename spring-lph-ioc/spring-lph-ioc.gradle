@@ -1,9 +1,22 @@
 description = "Spring LphIoc "
 
+sourceCompatibility = 1.8
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
 
 dependencies {
+//    testCompile group: 'junit', name: 'junit', version: '4.12'
+    optional(project(":spring-beans"))
+    optional(project(":spring-core"))
+    optional(project(":spring-aop"))
     optional(project(":spring-context"))
+//    optional("org.aspectj:aspectjweaver:${aspectjVersion}")
 }
+
+
 // 创建缺失的src目录
 //task "create-dirs" {
 //    sourceSets*.java.srcDirs*.each {
