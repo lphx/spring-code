@@ -168,9 +168,14 @@ class ConfigurationClassParser {
 
 
 	public void parse(Set<BeanDefinitionHolder> configCandidates) {
+		/**
+		 * 用于来保存延时的ImportSelectors，最最最著名的代表就是我们的SpringBoot自动装配的的类 AutoConfigurationImportSelector
+		 */
+		// 循环配置类
 		for (BeanDefinitionHolder holder : configCandidates) {
 			BeanDefinition bd = holder.getBeanDefinition();
 			try {
+				//真正的解析我们的bean定义 :通过注解元数据 解析
 				if (bd instanceof AnnotatedBeanDefinition) {
 					parse(((AnnotatedBeanDefinition) bd).getMetadata(), holder.getBeanName());
 				}
@@ -190,6 +195,7 @@ class ConfigurationClassParser {
 			}
 		}
 
+		//处理我们延时的DeferredImportSelectors w我们springboot就是通过这步进行记载spring.factories文件中的自定装配的对象
 		this.deferredImportSelectorHandler.process();
 	}
 
