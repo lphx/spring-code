@@ -8,7 +8,7 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 public class MainStarter {
 
 	public static void main(String[] args)   {
-		// 加载spring上下文
+		// 加载spring上下文11
 		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(MainConfig.class);
 
 		Car car =  (Car) context.getBean("car");
