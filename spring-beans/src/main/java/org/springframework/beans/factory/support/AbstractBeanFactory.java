@@ -250,7 +250,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			throws BeansException {
 
 		/**
-		 * 在这里 传入进来的name 可能是 别名, 也有可能是工厂bean的name,所以在这里需要转换
+		 * 在这里传入进来的name 可能是别名, 也有可能是工厂bean的name,所以在这里需要转换
 		 */
 		String beanName = transformedBeanName(name);
 		Object beanInstance;
