@@ -280,19 +280,24 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<>();
 		//循环我们的包路径集合
 		for (String basePackage : basePackages) {
-			//找到候选的Components
+			//找到候选的Components   根据包名找到符合条件的BeanDefinition集合
 			Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
 			for (BeanDefinition candidate : candidates) {
 				ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
 				candidate.setScope(scopeMetadata.getScopeName());
 				//设置我们的beanName
 				String beanName = this.beanNameGenerator.generateBeanName(candidate, this.registry);
-				//这是默认配置 autowire-candidate
+
+				//由findCandidateComponents内部可知，这里的candidate是ScannedGenericBeanDefinition
+				//而ScannedGenericBeanDefinition是AbstractBeanDefinition和AnnotatedBeanDefinition的之类
+				//所以下面的两个if都会进入
 				if (candidate instanceof AbstractBeanDefinition) {
+					//内部会设置默认值
 					postProcessBeanDefinition((AbstractBeanDefinition) candidate, beanName);
 				}
 				//获取@Lazy @DependsOn等注解的数据设置到BeanDefinition中
 				if (candidate instanceof AnnotatedBeanDefinition) {
+					//如果是AnnotatedBeanDefinition，还会再设置一次值
 					AnnotationConfigUtils.processCommonDefinitionAnnotations((AnnotatedBeanDefinition) candidate);
 				}
 				//把我们解析出来的组件bean定义注册到我们的IOC容器中（容器中没有才注册）

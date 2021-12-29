@@ -309,6 +309,8 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @return a corresponding Set of autodetected bean definitions
 	 */
 	public Set<BeanDefinition> findCandidateComponents(String basePackage) {
+		//spring支持component索引技术，需要引入一个组件，因为大部分情况不会引入这个组件
+		//所以不会进入到这个if
 		if (this.componentsIndex != null && indexSupportsIncludeFilters()) {
 			return addCandidateComponentsFromIndex(this.componentsIndex, basePackage);
 		}
@@ -416,21 +418,24 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
-			//把我们的包路径转为资源路径 cn/lph/iocbeanlifecicle
+			//把 传进来的类似 命名空间形式的字符串转换成类似类文件地址的形式，然后在前面加上classpath*:
+			//即：com.xx=>classpath*:com/xx/**/*.class
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
-			//扫描指定包路径下面的所有.class文件
+			//根据packageSearchPath，获得符合要求的文件.class文件
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
 			boolean traceEnabled = logger.isTraceEnabled();
 			boolean debugEnabled = logger.isDebugEnabled();
-			//需要我们的resources集合
+			//循环resources集合
 			for (Resource resource : resources) {
 				if (traceEnabled) {
 					logger.trace("Scanning " + resource);
 				}
 				try {
+					//metadataReader 元数据读取器，解析resource，也可以理解为描述资源的数据结构
 					MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
-					//是不是候选的组件
+					//在isCandidateComponent方法内部会真正执行匹配规则
+					//注册配置类自身会被排除，不会进入到这个if
 					if (isCandidateComponent(metadataReader)) {
 						//包装成为一个ScannedGenericBeanDefinition
 						ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
