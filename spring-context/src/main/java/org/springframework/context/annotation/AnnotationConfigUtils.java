@@ -167,6 +167,10 @@ public abstract class AnnotationConfigUtils {
 		/**
 		 * 为我们容器中注册了解析我们配置类的后置处理器ConfigurationClassPostProcessor
 		 * 名字叫:org.springframework.context.annotation.internalConfigurationAnnotationProcessor
+		 *
+		 判断容器中是否已经存在了ConfigurationClassPostProcessorBean
+		 如果不存在（当然这里肯定是不存在的），就通过RootBeanDefinition的构造方法获得ConfigurationClassPostProcessor的BeanDefinition，RootBeanDefinition是BeanDefinition的子类
+		 执行registerPostProcessor方法，registerPostProcessor方法内部就是注册Bean，当然这里注册其他Bean也是一样的流程
 		 */
 		if (!registry.containsBeanDefinition(CONFIGURATION_ANNOTATION_PROCESSOR_BEAN_NAME)) {
 			RootBeanDefinition def = new RootBeanDefinition(ConfigurationClassPostProcessor.class);
