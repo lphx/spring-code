@@ -277,18 +277,36 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 	public void processConfigBeanDefinitions(BeanDefinitionRegistry registry) {
 		List<BeanDefinitionHolder> configCandidates = new ArrayList<>();
 		//获取IOC 容器中目前所有bean定义的名称
+		//获得所有的BeanDefinition的Name，放入candidateNames数组
 		String[] candidateNames = registry.getBeanDefinitionNames();
 
 		//循环我们的上一步获取的所有的bean定义信息
 		for (String beanName : candidateNames) {
 			//通过bean的名称来获取我们的bean定义对象
 			BeanDefinition beanDef = registry.getBeanDefinition(beanName);
+
+			// 内部有两个标记位来标记是否已经处理过了
+			// 这里会引发一连串知识盲点
+			// 当我们注册配置类的时候，可以不加Configuration注解，直接使用Component ComponentScan Import ImportResource注解，称之为Lite配置类
+			// 如果加了Configuration注解，就称之为Full配置类
+			// 如果我们注册了Lite配置类，我们getBean这个配置类，会发现它就是原本的那个配置类
+			// 如果我们注册了Full配置类，我们getBean这个配置类，会发现它已经不是原本那个配置类了，而是已经被cgilb代理的类了
+			// 写一个A类，其中有一个构造方法，打印出“你好”
+			// 再写一个配置类，里面有两个bean注解的方法
+			// 其中一个方法new了A 类，并且返回A的对象，把此方法称之为getA
+			// 第二个方法又调用了getA方法
+			// 如果配置类是Lite配置类，会发现打印了两次“你好”，也就是说A类被new了两次
+			// 如果配置类是Full配置类，会发现只打印了一次“你好”，也就是说A类只被new了一次，因为这个类被cgilb代理了，方法已经被改写
 			//判断是否有没有解析过
 			if (beanDef.getAttribute(ConfigurationClassUtils.CONFIGURATION_CLASS_ATTRIBUTE) != null) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Bean definition has already been processed as a configuration class: " + beanDef);
 				}
 			}
+
+			//判断是否为配置类（有两种情况 一种是传统意义上的配置类，一种是普通的bean），
+			//在这个方法内部，会做判断，这个配置类是Full配置类，还是Lite配置类，并且做上标记
+			//满足条件，加入到configCandidates
 			//进行正在的解析判断是不是完全的配置类 还是一个非正式的配置类
 			else if (ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory)) {
 				//满足添加 就加入到候选的配置类集合中
@@ -312,9 +330,11 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		// 创建我们通过@CompentScan导入进来的bean name的生成器
 		// 创建我们通过@Import导入进来的bean的名称
 		SingletonBeanRegistry sbr = null;
+		// DefaultListableBeanFactory最终会实现SingletonBeanRegistry接口，所以可以进入到这个if
 		if (registry instanceof SingletonBeanRegistry) {
 			sbr = (SingletonBeanRegistry) registry;
 			if (!this.localBeanNameGeneratorSet) {
+				//spring中可以修改默认的bean命名方式，这里就是看用户有没有自定义bean命名方式，虽然一般没有人会这么做
 				BeanNameGenerator generator = (BeanNameGenerator) sbr.getSingleton(
 						AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR);
 				if (generator != null) {
@@ -357,7 +377,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 						registry, this.sourceExtractor, this.resourceLoader, this.environment,
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
-			// 此处才把@Bean的方法和@Import 注册到BeanDefinitionMap中
+			// 此处才把@Bean的方法和@Import @ImportRosource  注册到BeanDefinitionMap中
 			this.reader.loadBeanDefinitions(configClasses);
 			//加入到已经解析的集合中
 			alreadyParsed.addAll(configClasses);
@@ -365,13 +385,15 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 			candidates.clear();
 			//判断我们ioc容器中的是不是>候选原始的bean定义的个数
+			//获得注册器里面BeanDefinition的数量 和 candidateNames进行比较
+			//如果大于的话，说明有新的BeanDefinition注册进来了
 			if (registry.getBeanDefinitionCount() > candidateNames.length) {
 				//获取所有的bean定义
 				String[] newCandidateNames = registry.getBeanDefinitionNames();
 				//原始的老的候选的bean定义
 				Set<String> oldCandidateNames = new HashSet<>(Arrays.asList(candidateNames));
 				Set<String> alreadyParsedClasses = new HashSet<>();
-				//赋值已经解析的
+				//循环alreadyParsed。把类名加入到alreadyParsedClasses
 				for (ConfigurationClass configurationClass : alreadyParsed) {
 					alreadyParsedClasses.add(configurationClass.getMetadata().getClassName());
 				}
