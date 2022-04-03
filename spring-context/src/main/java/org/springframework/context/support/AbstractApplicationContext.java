@@ -837,12 +837,18 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * Use parent's if none defined in this context.
 	 */
 	protected void initMessageSource() {
+		//获取Bean工厂，一般是DefaultListBeanFactory
 		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+		//首先判断是否已有xml文件定义了id为messageSource的bean对象
 		if (beanFactory.containsLocalBean(MESSAGE_SOURCE_BEAN_NAME)) {
+			//如果有，则从Bean工厂得到这个bean对象
 			this.messageSource = beanFactory.getBean(MESSAGE_SOURCE_BEAN_NAME, MessageSource.class);
 			// Make MessageSource aware of parent MessageSource.
+			//当父类Bean工厂不为空，并且这个bean对象是HierarchicalMessageSource类型
 			if (this.parent != null && this.messageSource instanceof HierarchicalMessageSource) {
+				//为HierarchicalMessageSource的实现类
 				HierarchicalMessageSource hms = (HierarchicalMessageSource) this.messageSource;
+				//设置父类MessageSource，此处设置内部的parent messageSource
 				if (hms.getParentMessageSource() == null) {
 					// Only set parent context as parent MessageSource if no parent MessageSource
 					// registered already.
@@ -854,9 +860,14 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			}
 		} else {
 			// Use empty MessageSource to be able to accept getMessage calls.
+			//如果没有xml文件定义信息源对象，新建DelegatingMessageSource类作为messageSource的Bean
+			//因为DelegatingMessageSource类实现了HierarchicalMessageSource接口，而这个接口继承了MessageSource这个类
+			//因此实现了这个接口的类，都是MessageSource的子类，因此DelegatingMessageSource也是一个MessageSource
 			DelegatingMessageSource dms = new DelegatingMessageSource();
+			//给这个DelegatingMessageSource添加父类消息源
 			dms.setParentMessageSource(getInternalParentMessageSource());
 			this.messageSource = dms;
+			//将这个messageSource实例注册到Bean工厂中
 			beanFactory.registerSingleton(MESSAGE_SOURCE_BEAN_NAME, this.messageSource);
 			if (logger.isTraceEnabled()) {
 				logger.trace("No '" + MESSAGE_SOURCE_BEAN_NAME + "' bean, using [" + this.messageSource + "]");
@@ -865,21 +876,27 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
-	 * Initialize the ApplicationEventMulticaster.
-	 * Uses SimpleApplicationEventMulticaster if none defined in the context.
-	 *
+	 * 从bean工厂中获取或者直接显示的new一个多播器赋值给我们的applicatoinContext对象
+	 * 采用典型的设计模式就是观察者模式  多播器作为的是一个被观察者
 	 * @see org.springframework.context.event.SimpleApplicationEventMulticaster
 	 */
 	protected void initApplicationEventMulticaster() {
+		//获取我们的bean工厂对象
 		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+		//判断容器中是没有有我们的applicationEventMulticaster 应用多播器组件
 		if (beanFactory.containsLocalBean(APPLICATION_EVENT_MULTICASTER_BEAN_NAME)) {
+			//直接显示的调用我们的getBean获取出来赋值给我们的applicationContext对象
 			this.applicationEventMulticaster =
 					beanFactory.getBean(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, ApplicationEventMulticaster.class);
 			if (logger.isTraceEnabled()) {
 				logger.trace("Using ApplicationEventMulticaster [" + this.applicationEventMulticaster + "]");
 			}
-		} else {
+		}
+		//容器中没有的话
+		else {
+			//spring ioc显示的new 一个SimpleApplicationEventMulticaster对象保存在applicatoinContext对象中
 			this.applicationEventMulticaster = new SimpleApplicationEventMulticaster(beanFactory);
+			//并且注入到容器中
 			beanFactory.registerSingleton(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, this.applicationEventMulticaster);
 			if (logger.isTraceEnabled()) {
 				logger.trace("No '" + APPLICATION_EVENT_MULTICASTER_BEAN_NAME + "' bean, using " +
@@ -931,22 +948,27 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * Doesn't affect other listeners, which can be added without being beans.
 	 */
 	protected void registerListeners() {
-		// Register statically specified listeners first.
+		//获取容器中所有的监听器对象
+		// 这个时候正常流程是不会有监听器的
+		// （因为监听器不会在这之前注册，在initApplicationEventMulticaster后在registerListeners之前，只有一个可能在：在onRefresh里面注册了监听器）
 		for (ApplicationListener<?> listener : getApplicationListeners()) {
+			//把监听器挨个的注册到我们的多播器上去
 			getApplicationEventMulticaster().addApplicationListener(listener);
 		}
 
-		// Do not initialize FactoryBeans here: We need to leave all regular beans
-		// uninitialized to let post-processors apply to them!
+		//获取bean定义中的监听器对象
 		String[] listenerBeanNames = getBeanNamesForType(ApplicationListener.class, true, false);
+		//把监听器的名称注册到我们的多播器上
 		for (String listenerBeanName : listenerBeanNames) {
 			getApplicationEventMulticaster().addApplicationListenerBean(listenerBeanName);
 		}
 
-		// Publish early application events now that we finally have a multicaster...
+		//在这里获取我们的早期事件
 		Set<ApplicationEvent> earlyEventsToProcess = this.earlyApplicationEvents;
+		// 在这里赋null。  也就是值此之后都将没有早期事件了
 		this.earlyApplicationEvents = null;
 		if (!CollectionUtils.isEmpty(earlyEventsToProcess)) {
+			//通过多播器进行播发早期事件
 			for (ApplicationEvent earlyEvent : earlyEventsToProcess) {
 				getApplicationEventMulticaster().multicastEvent(earlyEvent);
 			}

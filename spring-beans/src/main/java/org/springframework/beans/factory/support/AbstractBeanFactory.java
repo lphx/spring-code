@@ -280,27 +280,35 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		}
 
 		else {
-			// Fail if we're already creating this bean instance:
-			// We're assumably within a circular reference.
+			/**
+			 * spring 只能解决单例对象的setter 注入的循环依赖,不能解决构造器注入
+			 */
 			if (isPrototypeCurrentlyInCreation(beanName)) {
 				throw new BeanCurrentlyInCreationException(beanName);
 			}
 
-			// Check if bean definition exists in this factory.
+			/**
+			 * 判断AbstractBeanFacotry工厂是否有父工厂(一般情况下是没有父工厂因为abstractBeanFactory直接是抽象类,不存在父工厂)
+			 * 一般情况下,只有Spring 和SpringMvc整合的时才会有父子容器的概念,
+			 * 比如我们的Controller中注入Service的时候，发现我们依赖的是一个引用对象，那么他就会调用getBean去把service找出来
+			 * 但是当前所在的容器是web子容器，那么就会在这里的 先去父容器找
+			 */
 			BeanFactory parentBeanFactory = getParentBeanFactory();
+			//若存在父工厂,切当前的bean工厂不存在当前的bean定义,那么bean定义是存在于父beanFacotry中
 			if (parentBeanFactory != null && !containsBeanDefinition(beanName)) {
-				// Not found -> check parent.
+				//获取bean的原始名称
 				String nameToLookup = originalBeanName(name);
+				//若为 AbstractBeanFactory 类型，委托父类处理
 				if (parentBeanFactory instanceof AbstractBeanFactory) {
 					return ((AbstractBeanFactory) parentBeanFactory).doGetBean(
 							nameToLookup, requiredType, args, typeCheckOnly);
 				}
 				else if (args != null) {
-					// Delegation to parent with explicit args.
+					//  委托给构造函数 getBean() 处理
 					return (T) parentBeanFactory.getBean(nameToLookup, args);
 				}
 				else if (requiredType != null) {
-					// No args -> delegate to standard getBean method.
+					// 没有 args，委托给标准的 getBean() 处理
 					return parentBeanFactory.getBean(nameToLookup, requiredType);
 				}
 				else {
@@ -308,6 +316,10 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				}
 			}
 
+			/**
+			 * 方法参数 typeCheckOnly ，是用来判断调用 #getBean(...) 方法时，表示是否为仅仅进行类型检查获取 Bean 对象
+			 * 如果不是仅仅做类型检查，而是创建 Bean 对象，则需要调用 #markBeanAsCreated(String beanName) 方法，进行记录
+			 */
 			if (!typeCheckOnly) {
 				markBeanAsCreated(beanName);
 			}
@@ -318,19 +330,46 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				if (requiredType != null) {
 					beanCreation.tag("beanType", requiredType::toString);
 				}
+
+				/**
+				 * 从容器中获取 beanName 相应的 GenericBeanDefinition 对象，并将其转换为 RootBeanDefinition 对象
+				 *   <bean id="tulingParentCompent" class="com.tuling.testparentsonbean.TulingParentCompent" abstract="true">
+				 <property name="tulingCompent" ref="tulingCompent"></property>
+				 </bean>
+				 <bean id="tulingSonCompent" class="com.tuling.testparentsonbean.TulingSonCompent" parent="tulingParentCompent"></bean>
+				 */
 				RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
 				checkMergedBeanDefinition(mbd, beanName, args);
 
-				// Guarantee initialization of beans that the current bean depends on.
+				/**
+				 *
+				 * @Bean
+				public DependsA dependsA() {
+				return new DependsA();
+				}
+
+				 @Bean
+				 @DependsOn(value = {"dependsA"})
+				 public DependsB dependsB() {
+				 return new DependsB();
+				 }
+				  * 处理dependsOn的依赖(这个不是我们所谓的循环依赖 而是bean创建前后的依赖)
+				 */
+				//依赖bean的名称
 				String[] dependsOn = mbd.getDependsOn();
 				if (dependsOn != null) {
+					// <1> 若给定的依赖 bean 已经注册为依赖给定的 bean
+					// 即循环依赖的情况，抛出 BeanCreationException 异常
 					for (String dep : dependsOn) {
+						//beanName是当前正在创建的bean,dep是正在创建的bean的依赖的bean的名称
 						if (isDependent(beanName, dep)) {
 							throw new BeanCreationException(mbd.getResourceDescription(), beanName,
 									"Circular depends-on relationship between '" + beanName + "' and '" + dep + "'");
 						}
+						//保存的是依赖 beanName 之间的映射关系：依赖 beanName - > beanName 的集合
 						registerDependentBean(dep, beanName);
 						try {
+							//获取depentceOn的bean
 							getBean(dep);
 						}
 						catch (NoSuchBeanDefinitionException ex) {
@@ -340,20 +379,20 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 					}
 				}
 
-				// Create bean instance.
+				//创建单例bean
 				if (mbd.isSingleton()) {
 
 
 					//getSingleton中的第二个参数类型是ObjectFactory<?>，是一个函数式接口，不会立刻执行，而是在
 					//getSingleton方法中，调用ObjectFactory的getObject，才会执行createBean
+					//把beanName 和一个singletonFactory 并且传入一个回调对象用于回调
 					sharedInstance = getSingleton(beanName, () -> {
 						try {
+							//进入创建bean的逻辑
 							return createBean(beanName, mbd, args);
 						}
 						catch (BeansException ex) {
-							// Explicitly remove instance from singleton cache: It might have been put there
-							// eagerly by the creation process, to allow for circular reference resolution.
-							// Also remove any beans that received a temporary reference to the bean.
+							//创建bean的过程中发生异常,需要销毁关于当前bean的所有信息
 							destroySingleton(beanName);
 							throw ex;
 						}
